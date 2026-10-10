@@ -29,7 +29,6 @@ class TestConnection:
         connection_page.wait_for_connected(timeout=30)
         assert connection_page.is_connected() == True
 
-    @SKIP_IN_CI
     @allure.story("断开打印机连接")
     @allure.severity(allure.severity_level.CRITICAL)
     def test_disconnect_printer(self, connection_page):
