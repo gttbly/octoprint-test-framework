@@ -38,12 +38,17 @@ jobs:
           plugins:
             virtual_printer:
               enabled: true
+          serial:
+            autoconnect: true
+            port: VIRTUAL
+            baudrate: 250000
+            printerProfile: _default
           server:
             host: 127.0.0.1
             port: 5000
           EOF
           octoprint serve --host 127.0.0.1 --port 5000 &
-          sleep 40
+          sleep 60
 
       - name: Run tests
         env:

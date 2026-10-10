@@ -6,10 +6,6 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 
-SKIP_IN_CI = pytest.mark.skipif(
-    os.getenv("CI") == "true",
-    reason="CI 环境未配置虚拟打印机端口，跳过此测试"
-)
 
 @allure.feature("打印机连接")
 class TestConnection:
@@ -22,7 +18,6 @@ class TestConnection:
         )
         time.sleep(2)
 
-    @SKIP_IN_CI
     @allure.story("连接虚拟打印机")
     @allure.severity(allure.severity_level.BLOCKER)
     def test_connect_virtual_printer(self, connection_page):
