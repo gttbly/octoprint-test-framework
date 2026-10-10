@@ -11,3 +11,14 @@ selenium_env/
 # 测试报告
 allure-results/
 screenshots/
+
+# 安装包
+*.tgz
+*.deb
+
+# 临时调试脚本
+diagnose*.py
+test_config.py
+
+# 截图
+*.png
