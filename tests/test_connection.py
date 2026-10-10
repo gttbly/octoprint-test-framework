@@ -4,7 +4,19 @@ import time
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
+import os
+import pytest
 
+# CI 环境跳过依赖虚拟打印机环境配置的用例
+SKIP_IN_CI = pytest.mark.skipif(
+    os.getenv("CI") == "true",
+    reason="CI 环境未配置虚拟打印机端口，跳过此测试"
+)
+
+class TestConnection:
+    @SKIP_IN_CI
+    @allure.story("连接虚拟打印机")
+    
 
 @allure.feature("打印机连接")
 class TestConnection:
