@@ -1,0 +1,7 @@
+selenium>=4.0
+pytest
+pytest-html
+allure-pytest
+requests
+python-dotenv
+webdriver-manager
