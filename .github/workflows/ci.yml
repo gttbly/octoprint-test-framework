@@ -1,0 +1,62 @@
+name: OctoPrint Selenium Tests
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: Install Chrome
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y google-chrome-stable
+
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+
+      - name: Install OctoPrint and start it
+        run: |
+          pip install octoprint
+          mkdir -p ~/.octoprint
+          cat > ~/.octoprint/config.yaml << 'EOF'
+          accessControl:
+            enabled: false
+          plugins:
+            virtual_printer:
+              enabled: true
+          server:
+            host: 127.0.0.1
+            port: 5000
+          EOF
+          octoprint serve --host 127.0.0.1 --port 5000 &
+          sleep 40
+
+      - name: Run tests
+        env:
+          OCTOPRINT_URL: http://127.0.0.1:5000
+          OCTOPRINT_USERNAME: ""
+          OCTOPRINT_PASSWORD: ""
+          OCTOPRINT_API_KEY: ""
+        run: |
+          PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 pytest tests/ -v --alluredir=allure-results
+
+      - name: Upload Allure results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: allure-results
+          path: allure-results/
