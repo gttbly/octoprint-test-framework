@@ -5,7 +5,9 @@ from config.config import Config
 class OctoPrintAPI:
     def __init__(self):
         self.base_url = Config.BASE_URL
-        self.headers = {"X-Api-Key": Config.API_KEY}
+        self.headers = {}
+        if Config.API_KEY:
+            self.headers["X-Api-Key"] = Config.API_KEY
 
     def connect_printer(self):
         try:
@@ -39,7 +41,6 @@ class OctoPrintAPI:
         return state.get("temperature", {}).get("bed", {})
 
     def send_gcode(self, commands):
-        """发送 G-code。成功时 OctoPrint 返回 204 No Content，没有响应体。"""
         r = requests.post(
             f"{self.base_url}/api/printer/command",
             headers=self.headers,
@@ -47,7 +48,6 @@ class OctoPrintAPI:
             timeout=10
         )
         r.raise_for_status()
-        # 204 没有响应体，直接返回 True；200 才尝试解析 JSON
         if r.status_code == 204 or not r.content:
             return True
         return r.json()
