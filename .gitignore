@@ -1,0 +1,13 @@
+# 环境变量文件（含敏感信息）
+.env
+
+# Python 缓存
+__pycache__/
+*.pyc
+
+# 虚拟环境
+selenium_env/
+
+# 测试报告
+allure-results/
+screenshots/
