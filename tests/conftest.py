@@ -1,14 +1,16 @@
+import os
 import pytest
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
-from webdriver_manager.chrome import ChromeDriverManager
 from config.config import Config
+
 
 def pytest_addoption(parser):
     parser.addoption("--headless", action="store_true", default=False)
+
 
 @pytest.fixture(scope="session")
 def driver(request):
@@ -19,13 +21,20 @@ def driver(request):
         options.add_argument("--disable-dev-shm-usage")
     options.add_argument("--window-size=1920,1080")
 
-    driver = webdriver.Chrome(
-        service=Service(ChromeDriverManager().install()),
-        options=options
-    )
+    # 直接用本地已有的 ChromeDriver，不联网检查版本
+    local_driver = "/usr/local/bin/chromedriver"
+    if os.path.exists(local_driver):
+        service = Service(local_driver)
+    else:
+        # 兜底：如果本地没有，才用 webdriver-manager
+        from webdriver_manager.chrome import ChromeDriverManager
+        service = Service(ChromeDriverManager().install())
+
+    driver = webdriver.Chrome(service=service, options=options)
     driver.base_url = Config.BASE_URL
     driver.implicitly_wait(5)
 
+    # 自动登录
     driver.get(driver.base_url)
     if "login" in driver.current_url:
         print("\n检测到需要登录，正在自动登录...")
@@ -38,10 +47,12 @@ def driver(request):
     yield driver
     driver.quit()
 
+
 @pytest.fixture
 def login_page(driver):
     from pages.login_page import LoginPage
     return LoginPage(driver)
+
 
 @pytest.fixture
 def connection_page(driver):
