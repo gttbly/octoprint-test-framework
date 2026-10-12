@@ -16,6 +16,7 @@ concurrency:
 
 env:
   PYTHONUNBUFFERED: "1"
+  PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
   OCTOPRINT_URL: http://127.0.0.1:5000
   OCTOPRINT_API_KEY: ci-e2e-global-api-key
   OCTOPRINT_USERNAME: automation-admin
