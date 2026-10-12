@@ -1,30 +1,36 @@
 from selenium.webdriver.common.by import By
-from selenium.webdriver.support.ui import WebDriverWait
+
+from config.config import Config
 from pages.base_page import BasePage
 
 
 class ConnectionPage(BasePage):
-    CONNECT_BUTTON = (By.ID, "printer_connect")
+    CONNECT_BUTTON = (By.CSS_SELECTOR, "[data-test-id='connection-connect']")
+    STATE = (By.CSS_SELECTOR, "[data-test-id='state-string']")
 
-    def click_connect_button(self):
-        btn = self.wait.until(lambda d: d.find_element(*self.CONNECT_BUTTON))
-        self.driver.execute_script("arguments[0].click();", btn)
+    def open(self):
+        super().open("/#connection")
+        self.find(self.CONNECT_BUTTON)
         return self
 
-    def get_button_text(self):
-        btn = self.wait.until(lambda d: d.find_element(*self.CONNECT_BUTTON))
-        return btn.get_attribute("textContent").strip()
+    def toggle_connection(self):
+        button = self.find(self.CONNECT_BUTTON)
+        self.driver.execute_script("arguments[0].click();", button)
+        return self
 
-    def is_connected(self):
-        return "Disconnect" in self.get_button_text()
+    def button_text(self) -> str:
+        return self.find(self.CONNECT_BUTTON).get_attribute("textContent").strip()
 
-    def wait_for_connected(self, timeout=30):
-        WebDriverWait(self.driver, timeout).until(
-            lambda d: "Disconnect" in d.find_element(By.ID, "printer_connect").get_attribute("textContent")
-        )
+    def state(self) -> str:
+        return self.get_text(self.STATE)
 
-    def wait_for_disconnected(self, timeout=30):
-        # 关键：必须是 "Disconnect" not in，否则 "Connect" 会被误判
-        WebDriverWait(self.driver, timeout).until(
-            lambda d: "Disconnect" not in d.find_element(By.ID, "printer_connect").get_attribute("textContent")
-        )
+    def is_connected(self) -> bool:
+        return self.state() not in {"Offline", "Closed"}
+
+    def wait_for_connected(self, timeout: int = Config.LONG_TIMEOUT):
+        self.wait_until(lambda _: self.state() == "Operational", timeout)
+        return self
+
+    def wait_for_disconnected(self, timeout: int = Config.LONG_TIMEOUT):
+        self.wait_until(lambda _: self.state() in {"Offline", "Closed"}, timeout)
+        return self

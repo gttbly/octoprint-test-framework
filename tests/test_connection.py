@@ -1,49 +1,42 @@
-import os
 import allure
 import pytest
-import time
-from selenium.webdriver.common.by import By
-from selenium.webdriver.support.ui import WebDriverWait
-from selenium.webdriver.support import expected_conditions as EC
 
 
-SKIP_IN_CI = pytest.mark.skipif(
-    os.getenv("CI") == "true",
-    reason="CI 环境虚拟打印机自动连接不稳定，此测试需在本地运行"
-)
-
-
-@allure.feature("打印机连接")
+@pytest.mark.connection
+@allure.feature("打印机连接管理")
 class TestConnection:
+    @pytest.mark.api
+    @allure.story("查询串口、波特率和打印机配置")
+    def test_connection_options_are_available(self, api_client):
+        connection = api_client.get_connection()
 
-    @pytest.fixture(autouse=True)
-    def setup(self, driver):
-        driver.get(f"{driver.base_url}/#connection")
-        WebDriverWait(driver, 20).until(
-            EC.presence_of_element_located((By.ID, "printer_connect"))
-        )
-        time.sleep(2)
+        assert set(connection) == {"current", "options"}
+        assert connection["options"]["ports"]
+        assert connection["options"]["baudrates"]
+        assert connection["options"]["printerProfiles"]
 
-    @SKIP_IN_CI
-    @allure.story("连接虚拟打印机")
-    @allure.severity(allure.severity_level.BLOCKER)
-    def test_connect_virtual_printer(self, connection_page):
-        if connection_page.is_connected():
-            connection_page.click_connect_button()
-            connection_page.wait_for_disconnected()
-            time.sleep(3)
-        connection_page.click_connect_button()
-        connection_page.wait_for_connected(timeout=30)
-        assert connection_page.is_connected() == True
+    @pytest.mark.api
+    @pytest.mark.virtual_printer
+    @allure.story("断线后重新连接虚拟打印机")
+    def test_disconnect_and_reconnect(self, api_client, virtual_printer):
+        api_client.disconnect_printer()
+        assert api_client.wait_for_connection_state({"Closed", "Offline"}) in {"Closed", "Offline"}
 
-    @SKIP_IN_CI
-    @allure.story("断开打印机连接")
-    @allure.severity(allure.severity_level.CRITICAL)
-    def test_disconnect_printer(self, connection_page):
-        if not connection_page.is_connected():
-            connection_page.click_connect_button()
-            connection_page.wait_for_connected(timeout=30)
-            time.sleep(2)
-        connection_page.click_connect_button()
-        connection_page.wait_for_disconnected(timeout=30)
-        assert connection_page.is_connected() == False
+        api_client.connect_printer(port="VIRTUAL", baudrate=250000)
+        assert api_client.wait_for_connection_state({"Operational"}) == "Operational"
+
+    @pytest.mark.ui
+    @pytest.mark.virtual_printer
+    @allure.story("Web 控制台断开并恢复打印机连接")
+    def test_connection_can_be_toggled_from_web(self, connection_page, virtual_printer):
+        page = connection_page.open()
+        try:
+            if page.is_connected():
+                page.toggle_connection().wait_for_disconnected()
+            assert not page.is_connected()
+
+            page.toggle_connection().wait_for_connected()
+            assert page.state() == "Operational"
+        finally:
+            if not page.is_connected():
+                page.toggle_connection().wait_for_connected()

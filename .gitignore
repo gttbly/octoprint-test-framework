@@ -1,5 +1,6 @@
 # 环境变量文件（含敏感信息）
 .env
+!.env.example
 
 # Python 缓存
 __pycache__/
@@ -8,8 +9,9 @@ __pycache__/
 # 虚拟环境
 selenium_env/
 
-# 测试报告
-allure-results/
+# 测试报告与失败证据
+allure-results*/
+artifacts/
 screenshots/
 
 # 安装包

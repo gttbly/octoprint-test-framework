@@ -1,40 +1,64 @@
-name: OctoPrint Selenium Tests
+name: OctoPrint Automation Tests
 
 on:
   push:
-    branches: [ main ]
+    branches: [main]
   pull_request:
-    branches: [ main ]
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: octoprint-tests-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  PYTHONUNBUFFERED: "1"
+  OCTOPRINT_URL: http://127.0.0.1:5000
+  OCTOPRINT_API_KEY: ci-e2e-global-api-key
+  OCTOPRINT_USERNAME: automation-admin
+  OCTOPRINT_PASSWORD: ci-e2e-password
+  HEADLESS: "true"
+  CI: "true"
 
 jobs:
-  test:
+  quality-and-integration:
     runs-on: ubuntu-latest
+    timeout-minutes: 25
 
     steps:
-      - name: Checkout code
+      - name: Checkout repository
         uses: actions/checkout@v4
 
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.10'
+          python-version: "3.10"
+          cache: pip
 
-      - name: Install Chrome
+      - name: Install project and OctoPrint
         run: |
-          sudo apt-get update
-          sudo apt-get install -y google-chrome-stable
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt "OctoPrint==1.11.8"
 
-      - name: Install dependencies
+      - name: Run static quality checks
         run: |
-          pip install -r requirements.txt
+          ruff check .
+          ruff format --check .
+          python -m compileall -q config pages tests utils
 
-      - name: Install OctoPrint and start it
+      - name: Configure OctoPrint test instance
+        env:
+          OCTOPRINT_BASEDIR: ${{ runner.temp }}/octoprint
         run: |
-          pip install octoprint
-          mkdir -p ~/.octoprint
-          cat > ~/.octoprint/config.yaml << 'EOF'
+          mkdir -p "$OCTOPRINT_BASEDIR"
+          cat > "$OCTOPRINT_BASEDIR/config.yaml" <<'EOF'
           accessControl:
-            enabled: false
+            enabled: true
+          api:
+            key: ci-e2e-global-api-key
           plugins:
             virtual_printer:
               enabled: true
@@ -42,23 +66,52 @@ jobs:
             autoconnect: true
             port: VIRTUAL
             baudrate: 250000
+          server:
+            firstRun: false
+            secretKey: ci-e2e-session-secret
+            onlineCheck:
+              enabled: false
+            pluginBlacklist:
+              enabled: false
           EOF
-          octoprint serve --host 127.0.0.1 --port 5000 &
-          sleep 60
+          octoprint --basedir "$OCTOPRINT_BASEDIR" user add automation-admin \
+            --password ci-e2e-password --admin
 
-      - name: Run smoke tests
+      - name: Start OctoPrint and wait for readiness
         env:
-          CI: "true"
-          OCTOPRINT_URL: http://127.0.0.1:5000
-          OCTOPRINT_USERNAME: ""
-          OCTOPRINT_PASSWORD: ""
-          OCTOPRINT_API_KEY: ""
+          OCTOPRINT_BASEDIR: ${{ runner.temp }}/octoprint
         run: |
-          PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 pytest tests/ -v --alluredir=allure-results
+          nohup octoprint --basedir "$OCTOPRINT_BASEDIR" serve \
+            --host 127.0.0.1 --port 5000 > "${{ runner.temp }}/octoprint.log" 2>&1 &
+          for attempt in {1..90}; do
+            if curl --fail --silent --show-error \
+              -H "X-Api-Key: $OCTOPRINT_API_KEY" \
+              "$OCTOPRINT_URL/api/version" > /dev/null; then
+              exit 0
+            fi
+            sleep 2
+          done
+          cat "${{ runner.temp }}/octoprint.log"
+          exit 1
 
-      - name: Upload Allure results
+      - name: Run API and Web regression suite
+        run: |
+          pytest -v \
+            --alluredir=allure-results \
+            --html=artifacts/pytest-report.html \
+            --self-contained-html
+
+      - name: Collect OctoPrint server log
+        if: always()
+        run: cp "${{ runner.temp }}/octoprint.log" artifacts/octoprint.log || true
+
+      - name: Upload test evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: allure-results
-          path: allure-results/
+          name: octoprint-test-evidence-${{ github.run_number }}
+          path: |
+            allure-results/
+            artifacts/
+          if-no-files-found: warn
+          retention-days: 14
