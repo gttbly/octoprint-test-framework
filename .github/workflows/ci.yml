@@ -74,6 +74,11 @@ jobs:
               enabled: false
             pluginBlacklist:
               enabled: false
+            seenWizards:
+              corewizard: 999
+              backup: 999
+              tracking: 999
+              classicwebcam: 999
           EOF
           octoprint --basedir "$OCTOPRINT_BASEDIR" user add automation-admin \
             --password ci-e2e-password --admin

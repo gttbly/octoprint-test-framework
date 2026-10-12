@@ -8,8 +8,10 @@ from uuid import uuid4
 import allure
 import pytest
 from selenium import webdriver
+from selenium.common.exceptions import WebDriverException
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.chrome.service import Service
+from selenium.webdriver.common.by import By
 
 from config.config import Config
 from pages.connection_page import ConnectionPage
@@ -144,11 +146,34 @@ def browser(request):
     instance.quit()
 
 
+def _dismiss_blocking_wizard(browser) -> None:
+    """Close OctoPrint's first-run setup wizard if it is covering the page.
+
+    A freshly provisioned instance (e.g. in CI) may show this modal, which
+    intercepts clicks on the navbar and sidebar until it is dismissed.
+    """
+    try:
+        if not browser.find_elements(By.CSS_SELECTOR, ".modal.in"):
+            return
+        browser.execute_script(
+            "document.querySelectorAll('.modal.in').forEach(function(el) {"
+            "  el.classList.remove('in'); el.style.display = 'none';"
+            "});"
+            "document.querySelectorAll('.modal-backdrop').forEach(function(el) {"
+            "  el.parentNode.removeChild(el);"
+            "});"
+            "document.body.classList.remove('modal-open');"
+        )
+    except WebDriverException:
+        pass
+
+
 @pytest.fixture
 def driver(browser):
     if not Config.USERNAME or not Config.PASSWORD:
         pytest.fail("UI tests require OCTOPRINT_USERNAME and OCTOPRINT_PASSWORD")
     LoginPage(browser).open().login(Config.USERNAME, Config.PASSWORD)
+    _dismiss_blocking_wizard(browser)
     return browser
 
 
